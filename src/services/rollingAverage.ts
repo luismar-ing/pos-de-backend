@@ -6,19 +6,7 @@ const LEASE_MARGIN = 1.2;
 const MIN_LEASE = 5;
 
 export async function calculateLeaseQty(productId: string): Promise<number> {
-    const result = await pool.query(
-        `select coalesce(sum(quantity), 0) as total_units
-        from sale_events
-        where product_id = $1 and created_at > now() - ($2 * interval '1 minute')`,
-        [productId, SESSION_MINUTES]
-    );
-
-
-    const totalUnits = Number(result.rows[0].total_units);
-    const unitsPerMinute = totalUnits / SESSION_MINUTES;
-    const estimatedLease = Math.ceil(unitsPerMinute * LEASE_MINUTES * LEASE_MARGIN);
-
-    const stockResult = await pool.query(
+     const stockResult = await pool.query(
         `select central_stock from products where id = $1`,
         [productId]
     );
@@ -27,6 +15,17 @@ export async function calculateLeaseQty(productId: string): Promise<number> {
     if (remainingStock <= 0) {
         return 0;
     }
+    
+    const result = await pool.query(
+        `select coalesce(sum(quantity), 0) as total_units
+        from sale_events
+        where product_id = $1 and created_at > now() - ($2 * interval '1 minute')`,
+        [productId, SESSION_MINUTES]
+    );
+
+    const totalUnits = Number(result.rows[0].total_units);
+    const unitsPerMinute = totalUnits / SESSION_MINUTES;
+    const estimatedLease = Math.ceil(unitsPerMinute * LEASE_MINUTES * LEASE_MARGIN);
 
     const preferedLease = Math.max(estimatedLease, MIN_LEASE);
 
